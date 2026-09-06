@@ -1,0 +1,12 @@
+# Carpetas de compilacion generadas por Visual Studio / .NET
+bin/
+obj/
+
+# Archivos de usuario y configuracion local de Visual Studio
+*.user
+*.suo
+.vs/
+
+# Archivos temporales del sistema operativo
+.DS_Store
+Thumbs.db
