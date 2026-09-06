@@ -139,6 +139,187 @@ namespace ProyectoMundial.Estructuras
             return (clavePromovida, nuevoNodo);
         }
 
+        // ================= ELIMINAR =================
+        // Cantidad minima de claves que debe conservar un nodo (que no sea la
+        // raiz) despues de eliminar. Si un nodo queda por debajo de este
+        // minimo, se le "pide prestada" una clave a un hermano, o si ningun
+        // hermano puede prestar sin quedar tambien corto, se fusiona con uno.
+        private static readonly int MIN_HOJA = (int)System.Math.Ceiling((ORDEN - 1) / 2.0);
+        private static readonly int MIN_INTERNO = (int)System.Math.Ceiling(ORDEN / 2.0) - 1;
+
+        public bool Eliminar(string id)
+        {
+            bool eliminado = EliminarRec(raiz, id);
+
+            // Si la raiz es un nodo interno que se quedo sin claves, su unico
+            // hijo restante pasa a ser la nueva raiz (el arbol "encoge").
+            if (eliminado && !raiz.EsHoja && raiz.NumClaves == 0)
+                raiz = raiz.Hijos![0];
+
+            return eliminado;
+        }
+
+        private bool EliminarRec(NodoBMas nodo, string clave)
+        {
+            if (nodo.EsHoja)
+                return EliminarDeHoja(nodo, clave);
+
+            int pos = PosicionHijo(nodo, clave);
+            bool eliminado = EliminarRec(nodo.Hijos![pos], clave);
+            if (!eliminado)
+                return false;
+
+            var hijo = nodo.Hijos![pos];
+            int minimo = hijo.EsHoja ? MIN_HOJA : MIN_INTERNO;
+            if (hijo.NumClaves < minimo)
+                Rebalancear(nodo, pos);
+
+            return true;
+        }
+
+        private bool EliminarDeHoja(NodoBMas hoja, string clave)
+        {
+            int idx = -1;
+            for (int i = 0; i < hoja.NumClaves; i++)
+                if (hoja.Claves[i] == clave) { idx = i; break; }
+            if (idx == -1)
+                return false; // no existia esa clave
+
+            for (int i = idx; i < hoja.NumClaves - 1; i++)
+            {
+                hoja.Claves[i] = hoja.Claves[i + 1];
+                hoja.Datos![i] = hoja.Datos![i + 1];
+            }
+            hoja.NumClaves--;
+            return true;
+        }
+
+        // Decide si conviene pedir prestado a un hermano o fusionarse con uno.
+        private void Rebalancear(NodoBMas nodo, int pos)
+        {
+            var hijo = nodo.Hijos![pos];
+            int minimo = hijo.EsHoja ? MIN_HOJA : MIN_INTERNO;
+
+            bool hayIzquierdo = pos > 0;
+            bool hayDerecho = pos < nodo.NumClaves;
+
+            if (hayIzquierdo && nodo.Hijos![pos - 1].NumClaves > minimo)
+                PrestarDeIzquierda(nodo, pos);
+            else if (hayDerecho && nodo.Hijos![pos + 1].NumClaves > minimo)
+                PrestarDeDerecha(nodo, pos);
+            else if (hayIzquierdo)
+                Fusionar(nodo, pos - 1);
+            else if (hayDerecho)
+                Fusionar(nodo, pos);
+        }
+
+        private void PrestarDeIzquierda(NodoBMas nodo, int pos)
+        {
+            var hijo = nodo.Hijos![pos];
+            var izq = nodo.Hijos![pos - 1];
+
+            if (hijo.EsHoja)
+            {
+                for (int i = hijo.NumClaves; i > 0; i--)
+                {
+                    hijo.Claves[i] = hijo.Claves[i - 1];
+                    hijo.Datos![i] = hijo.Datos![i - 1];
+                }
+                hijo.Claves[0] = izq.Claves[izq.NumClaves - 1];
+                hijo.Datos![0] = izq.Datos![izq.NumClaves - 1];
+                hijo.NumClaves++;
+                izq.NumClaves--;
+
+                // El separador debe reflejar siempre la primera clave real de la hoja derecha.
+                nodo.Claves[pos - 1] = hijo.Claves[0];
+            }
+            else
+            {
+                for (int i = hijo.NumClaves; i > 0; i--)
+                    hijo.Claves[i] = hijo.Claves[i - 1];
+                for (int i = hijo.NumClaves + 1; i > 0; i--)
+                    hijo.Hijos![i] = hijo.Hijos![i - 1];
+
+                hijo.Claves[0] = nodo.Claves[pos - 1];
+                hijo.Hijos![0] = izq.Hijos![izq.NumClaves];
+                hijo.NumClaves++;
+
+                nodo.Claves[pos - 1] = izq.Claves[izq.NumClaves - 1];
+                izq.NumClaves--;
+            }
+        }
+
+        private void PrestarDeDerecha(NodoBMas nodo, int pos)
+        {
+            var hijo = nodo.Hijos![pos];
+            var der = nodo.Hijos![pos + 1];
+
+            if (hijo.EsHoja)
+            {
+                hijo.Claves[hijo.NumClaves] = der.Claves[0];
+                hijo.Datos![hijo.NumClaves] = der.Datos![0];
+                hijo.NumClaves++;
+
+                for (int i = 0; i < der.NumClaves - 1; i++)
+                {
+                    der.Claves[i] = der.Claves[i + 1];
+                    der.Datos![i] = der.Datos![i + 1];
+                }
+                der.NumClaves--;
+
+                nodo.Claves[pos] = der.Claves[0];
+            }
+            else
+            {
+                hijo.Claves[hijo.NumClaves] = nodo.Claves[pos];
+                hijo.Hijos![hijo.NumClaves + 1] = der.Hijos![0];
+                hijo.NumClaves++;
+
+                nodo.Claves[pos] = der.Claves[0];
+
+                for (int i = 0; i < der.NumClaves - 1; i++)
+                    der.Claves[i] = der.Claves[i + 1];
+                for (int i = 0; i < der.NumClaves; i++)
+                    der.Hijos![i] = der.Hijos![i + 1];
+                der.NumClaves--;
+            }
+        }
+
+        // Fusiona hijo(posIzq) con hijo(posIzq+1) en un solo nodo (queda en posIzq).
+        private void Fusionar(NodoBMas nodo, int posIzq)
+        {
+            var izq = nodo.Hijos![posIzq];
+            var der = nodo.Hijos![posIzq + 1];
+
+            if (izq.EsHoja)
+            {
+                for (int i = 0; i < der.NumClaves; i++)
+                {
+                    izq.Claves[izq.NumClaves + i] = der.Claves[i];
+                    izq.Datos![izq.NumClaves + i] = der.Datos![i];
+                }
+                izq.NumClaves += der.NumClaves;
+                izq.Siguiente = der.Siguiente;
+            }
+            else
+            {
+                izq.Claves[izq.NumClaves] = nodo.Claves[posIzq];
+                izq.Hijos![izq.NumClaves + 1] = der.Hijos![0];
+                for (int i = 0; i < der.NumClaves; i++)
+                {
+                    izq.Claves[izq.NumClaves + 1 + i] = der.Claves[i];
+                    izq.Hijos![izq.NumClaves + 2 + i] = der.Hijos![i + 1];
+                }
+                izq.NumClaves += der.NumClaves + 1;
+            }
+
+            for (int i = posIzq; i < nodo.NumClaves - 1; i++)
+                nodo.Claves[i] = nodo.Claves[i + 1];
+            for (int i = posIzq + 1; i < nodo.NumClaves; i++)
+                nodo.Hijos![i] = nodo.Hijos![i + 1];
+            nodo.NumClaves--;
+        }
+
         // ================= BUSCAR =================
         public Jugador? Buscar(string id)
         {
