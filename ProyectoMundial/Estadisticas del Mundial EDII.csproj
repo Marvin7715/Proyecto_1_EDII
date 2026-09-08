@@ -10,10 +10,4 @@
     <AssemblyName>ProyectoMundial</AssemblyName>
   </PropertyGroup>
 
-  <ItemGroup>
-    <None Update="Datos\jugadores_ejemplo.csv">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
 </Project>
