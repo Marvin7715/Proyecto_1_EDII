@@ -3,11 +3,7 @@ using ProyectoMundial.Modelos;
 
 namespace ProyectoMundial.Estructuras
 {
-    // Max Heap implementado desde cero, con un arreglo dinamico propio
-    // (sin List<T> ni PriorityQueue<T>). Cada elemento guarda una "clave"
-    // (el valor numerico por el que se ordena, ej. goles) y el Jugador
-    // correspondiente.
-    //
+    // Max Heap
     // Se usa para: obtener rapidamente el jugador con el valor mas alto en
     // una categoria (el "record"), y para generar el listado completo
     // ordenado de mayor a menor en esa categoria (heap sort).

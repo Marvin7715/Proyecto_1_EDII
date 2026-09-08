@@ -12,8 +12,7 @@ namespace ProyectoMundial.Estructuras
         public int NumClaves;
 
         // Los arreglos se crean con un espacio EXTRA (tamano = orden) para
-        // poder insertar temporalmente antes de dividir el nodo. Nunca se usa
-        // List<T> ni ninguna coleccion nativa: son arreglos de tamano fijo.
+        // poder insertar temporalmente antes de dividir el nodo.
         public string[] Claves;
         public Jugador[]? Datos;      // solo se usa si EsHoja == true
         public NodoBMas[]? Hijos;     // solo se usa si EsHoja == false

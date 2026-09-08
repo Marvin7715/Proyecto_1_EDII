@@ -3,8 +3,7 @@ using ProyectoMundial.Modelos;
 
 namespace ProyectoMundial.Estructuras
 {
-    // Arbol B+ implementado desde cero, sin usar List<T>, Dictionary,
-    // SortedDictionary ni ninguna coleccion nativa de .NET para su logica.
+    // Arbol B+
     // Se usa para indexar a los jugadores por su Id: permite buscar un
     // jugador especifico rapidamente, y ademas recorrer TODO el catalogo
     // ya ordenado (gracias al enlace entre hojas), sin tener que ordenar
