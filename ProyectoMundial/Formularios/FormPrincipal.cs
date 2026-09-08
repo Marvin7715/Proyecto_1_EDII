@@ -10,13 +10,26 @@ namespace ProyectoMundial.Formularios
     {
         private readonly GestorJugadores gestor = new GestorJugadores();
 
+        // ---- Paleta del tema oscuro (Futstats MV) ----
+        private static readonly Color ColorFondo = Color.FromArgb(0x12, 0x15, 0x1f);
+        private static readonly Color ColorPanel = Color.FromArgb(0x1c, 0x21, 0x30);
+        private static readonly Color ColorBorde = Color.FromArgb(0x3a, 0x41, 0x55);
+        private static readonly Color ColorSeleccion = Color.FromArgb(0x23, 0x2a, 0x3d);
+        private static readonly Color ColorTexto = Color.White;
+        private static readonly Color ColorTextoSecundario = Color.FromArgb(0x9a, 0xa3, 0xb8);
+        private static readonly Color ColorAcento = Color.FromArgb(0xe0, 0xa9, 0x4c);
+
         private Label lblEstado = null!;
+
+        // --- Barra de pestanas propia (reemplaza al TabControl nativo) ---
+        private Button[] botonesTab = null!;
+        private Panel[] panelesTab = null!;
 
         // --- Tab Registro ---
         private TextBox txtId = null!, txtNombre = null!, txtSeleccion = null!;
         private ComboBox cmbPosicion = null!;
         private NumericUpDown numMinutos = null!, numGoles = null!, numAsistencias = null!,
-                               numAmarillas = null!, numRojas = null!, numPartidos = null!;
+                               numAmarillas = null!, numRojas = null!, numPartidos = null!, numPorterias = null!;
 
         // --- Tab Busqueda ---
         private TextBox txtBuscarId = null!;
@@ -36,15 +49,17 @@ namespace ProyectoMundial.Formularios
 
         private void InitializeComponent()
         {
-            this.Text = "Tabla de posiciones - Mundial";
-            this.Width = 1100;
+            this.Text = "Futstats MV - Estadisticas del Mundial";
+            this.Width = 1150;
             this.Height = 700;
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.MinimumSize = new Size(950, 650);
+            this.MinimumSize = new Size(980, 650);
             this.Font = new Font("Segoe UI", 9.5F);
+            this.BackColor = ColorFondo;
+            this.ForeColor = ColorTexto;
 
-            var tabs = ConstruirTabs();
             var panelSuperior = ConstruirPanelSuperior();
+            var panelContenido = ConstruirContenido();
 
             lblEstado = new Label
             {
@@ -53,30 +68,147 @@ namespace ProyectoMundial.Formularios
                 TextAlign = ContentAlignment.MiddleLeft,
                 Text = "Listo.",
                 Padding = new Padding(8, 0, 0, 0),
-                BackColor = Color.WhiteSmoke
+                BackColor = ColorPanel,
+                ForeColor = ColorTextoSecundario
             };
 
-            this.Controls.Add(tabs);
+            // Orden importante: Fill primero, luego Top, luego Bottom.
+            this.Controls.Add(panelContenido);
             this.Controls.Add(panelSuperior);
             this.Controls.Add(lblEstado);
+
+            MostrarPestana(3); // Arranca en "Catalogo completo"
         }
 
-        // ================= PANEL SUPERIOR (cargar / guardar csv) =================
+        // ================= ENCABEZADO + BOTONES CSV + BARRA DE PESTANAS =================
+        // Todo esto vive en un unico panel Dock=Top, posicionado con Left/Top/Anchor
+        // (evita ambiguedades de orden entre varios controles con Dock=Top).
         private Panel ConstruirPanelSuperior()
         {
-            var panel = new Panel { Dock = DockStyle.Top, Height = 50 };
+            var panel = new Panel { Dock = DockStyle.Top, Height = 132, BackColor = ColorPanel };
 
-            var btnCargar = new Button { Text = "Cargar desde CSV...", Left = 10, Top = 10, Width = 170, Height = 30 };
+            var logo = new Panel
+            {
+                Left = 16,
+                Top = 14,
+                Width = 44,
+                Height = 44,
+                BackColor = ColorFondo
+            };
+            var lblLogo = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "\U0001F3C6", // trofeo
+                Font = new Font("Segoe UI Emoji", 18F),
+                ForeColor = ColorAcento,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            logo.Controls.Add(lblLogo);
+
+            var lblMarca = new Label
+            {
+                Left = 70, Top = 16, Width = 200, Height = 18,
+                Text = "Futstats MV",
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = ColorTextoSecundario
+            };
+            var lblTitulo = new Label
+            {
+                Left = 70, Top = 34, Width = 400, Height = 26,
+                Text = "Estadísticas del mundial",
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                ForeColor = ColorTexto
+            };
+
+            var btnCargar = BotonSecundario("Cargar desde CSV...", 170);
+            btnCargar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnCargar.Top = 16;
+            btnCargar.Left = panel.Width - 16 - 170 - 10 - 170;
             btnCargar.Click += BtnCargarCsv_Click;
 
-            var btnGuardar = new Button { Text = "Guardar en CSV...", Left = 190, Top = 10, Width = 170, Height = 30 };
+            var btnGuardar = BotonSecundario("Guardar en CSV...", 170);
+            btnGuardar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnGuardar.Top = 16;
+            btnGuardar.Left = panel.Width - 16 - 170;
             btnGuardar.Click += BtnGuardarCsv_Click;
 
+            // ---- Barra de pestanas (4 botones a partes iguales) ----
+            var tablaTabs = new TableLayoutPanel
+            {
+                Left = 16,
+                Top = 82,
+                Height = 40,
+                Width = panel.Width - 32,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                ColumnCount = 4,
+                RowCount = 1
+            };
+            for (int i = 0; i < 4; i++)
+                tablaTabs.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+
+            string[] titulosTab = { "Registro", "Busqueda", "Rankings", "Catalogo completo" };
+            botonesTab = new Button[4];
+            for (int i = 0; i < 4; i++)
+            {
+                var boton = new Button
+                {
+                    Text = titulosTab[i],
+                    Dock = DockStyle.Fill,
+                    Margin = new Padding(i == 0 ? 0 : 4, 0, 0, 0),
+                    FlatStyle = FlatStyle.Flat,
+                    BackColor = ColorPanel,
+                    ForeColor = ColorTexto
+                };
+                boton.FlatAppearance.BorderColor = ColorBorde;
+                boton.FlatAppearance.BorderSize = 1;
+
+                int indice = i; // copia local: evita el error clasico de closures en un for
+                boton.Click += (s, e) => MostrarPestana(indice);
+
+                botonesTab[i] = boton;
+                tablaTabs.Controls.Add(boton, i, 0);
+            }
+
+            panel.Controls.Add(logo);
+            panel.Controls.Add(lblMarca);
+            panel.Controls.Add(lblTitulo);
             panel.Controls.Add(btnCargar);
             panel.Controls.Add(btnGuardar);
+            panel.Controls.Add(tablaTabs);
+
             return panel;
         }
 
+        private Button BotonSecundario(string texto, int ancho)
+        {
+            var boton = new Button
+            {
+                Text = texto,
+                Width = ancho,
+                Height = 32,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = ColorPanel,
+                ForeColor = ColorTexto
+            };
+            boton.FlatAppearance.BorderColor = ColorBorde;
+            boton.FlatAppearance.BorderSize = 1;
+            return boton;
+        }
+
+        private void MostrarPestana(int indice)
+        {
+            for (int i = 0; i < panelesTab.Length; i++)
+            {
+                bool activo = (i == indice);
+                panelesTab[i].Visible = activo;
+                botonesTab[i].BackColor = activo ? ColorSeleccion : ColorPanel;
+                botonesTab[i].Font = new Font(botonesTab[i].Font, activo ? FontStyle.Bold : FontStyle.Regular);
+            }
+
+            if (indice == 3) RefrescarCatalogo();
+        }
+
+        // ================= CARGAR / GUARDAR CSV =================
         private void BtnCargarCsv_Click(object? sender, EventArgs e)
         {
             using var dialogo = new OpenFileDialog { Filter = "Archivos CSV (*.csv)|*.csv|Todos los archivos (*.*)|*.*" };
@@ -112,29 +244,28 @@ namespace ProyectoMundial.Formularios
 
         private void MostrarEstado(string mensaje) => lblEstado.Text = mensaje;
 
-        // ================= TABS =================
-        private TabControl ConstruirTabs()
+        // ================= CONTENIDO (4 paneles intercambiables) =================
+        private Control ConstruirContenido()
         {
-            var tabs = new TabControl { Dock = DockStyle.Fill };
+            var contenedor = new Panel { Dock = DockStyle.Fill, BackColor = ColorFondo };
 
-            var tabRegistro = new TabPage("Registro");
-            tabRegistro.Controls.Add(ConstruirPanelRegistro());
+            var panelRegistro = new Panel { Dock = DockStyle.Fill, BackColor = ColorFondo, Visible = false };
+            panelRegistro.Controls.Add(ConstruirPanelRegistro());
 
-            var tabBusqueda = new TabPage("Busqueda");
-            tabBusqueda.Controls.Add(ConstruirPanelBusqueda());
+            var panelBusqueda = new Panel { Dock = DockStyle.Fill, BackColor = ColorFondo, Visible = false };
+            panelBusqueda.Controls.Add(ConstruirPanelBusqueda());
 
-            var tabRankings = new TabPage("Rankings");
-            tabRankings.Controls.Add(ConstruirPanelRankings());
+            var panelRankings = new Panel { Dock = DockStyle.Fill, BackColor = ColorFondo, Visible = false };
+            panelRankings.Controls.Add(ConstruirPanelRankings());
 
-            var tabCatalogo = new TabPage("Catalogo completo");
-            tabCatalogo.Controls.Add(ConstruirPanelCatalogo());
+            var panelCatalogo = new Panel { Dock = DockStyle.Fill, BackColor = ColorFondo, Visible = false };
+            panelCatalogo.Controls.Add(ConstruirPanelCatalogo());
 
-            tabs.TabPages.Add(tabRegistro);
-            tabs.TabPages.Add(tabBusqueda);
-            tabs.TabPages.Add(tabRankings);
-            tabs.TabPages.Add(tabCatalogo);
+            panelesTab = new[] { panelRegistro, panelBusqueda, panelRankings, panelCatalogo };
+            foreach (var p in panelesTab)
+                contenedor.Controls.Add(p);
 
-            return tabs;
+            return contenedor;
         }
 
         // ================= REGISTRO =================
@@ -145,7 +276,8 @@ namespace ProyectoMundial.Formularios
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
                 RowCount = 0,
-                Padding = new Padding(24)
+                Padding = new Padding(24),
+                BackColor = ColorFondo
             };
             contenedor.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
             contenedor.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -155,23 +287,24 @@ namespace ProyectoMundial.Formularios
                 int fila = contenedor.RowCount;
                 contenedor.RowCount++;
                 contenedor.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
-                contenedor.Controls.Add(new Label { Text = etiqueta, TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, fila);
+                contenedor.Controls.Add(new Label { Text = etiqueta, TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill, ForeColor = ColorTexto }, 0, fila);
                 contenedor.Controls.Add(control, 1, fila);
             }
 
-            txtId = new TextBox { Dock = DockStyle.Fill };
-            txtNombre = new TextBox { Dock = DockStyle.Fill };
-            txtSeleccion = new TextBox { Dock = DockStyle.Fill };
-            cmbPosicion = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
+            txtId = CampoTexto();
+            txtNombre = CampoTexto();
+            txtSeleccion = CampoTexto();
+            cmbPosicion = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = ColorPanel, ForeColor = ColorTexto };
             cmbPosicion.Items.AddRange(new object[] { "Portero", "Defensa", "Mediocampista", "Delantero" });
             cmbPosicion.SelectedIndex = 0;
 
-            numMinutos = NuevoNumeric(0, 700);
+            numMinutos = NuevoNumeric(0, 900);
             numGoles = NuevoNumeric(0, 50);
             numAsistencias = NuevoNumeric(0, 50);
             numAmarillas = NuevoNumeric(0, 10);
             numRojas = NuevoNumeric(0, 5);
             numPartidos = NuevoNumeric(0, 10);
+            numPorterias = NuevoNumeric(0, 10);
 
             AgregarFila("Id (unico):", txtId);
             AgregarFila("Nombre:", txtNombre);
@@ -183,25 +316,31 @@ namespace ProyectoMundial.Formularios
             AgregarFila("Tarjetas amarillas:", numAmarillas);
             AgregarFila("Tarjetas rojas:", numRojas);
             AgregarFila("Partidos jugados:", numPartidos);
+            AgregarFila("Porterias a 0:", numPorterias);
 
             var panelBotones = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = true,
-                AutoSize = true
+                AutoSize = true,
+                BackColor = ColorFondo
             };
 
-            var btnRegistrar = new Button { Text = "Registrar nuevo", Width = 150, Height = 34 };
+            var btnRegistrar = BotonSecundario("Registrar nuevo", 150);
+            btnRegistrar.Height = 34;
             btnRegistrar.Click += BtnRegistrar_Click;
 
-            var btnCargarParaEditar = new Button { Text = "Cargar para editar", Width = 150, Height = 34 };
+            var btnCargarParaEditar = BotonSecundario("Cargar para editar", 150);
+            btnCargarParaEditar.Height = 34;
             btnCargarParaEditar.Click += BtnCargarParaEditar_Click;
 
-            var btnActualizar = new Button { Text = "Guardar cambios", Width = 150, Height = 34 };
+            var btnActualizar = BotonSecundario("Guardar cambios", 150);
+            btnActualizar.Height = 34;
             btnActualizar.Click += BtnActualizar_Click;
 
-            var btnLimpiar = new Button { Text = "Limpiar campos", Width = 140, Height = 34 };
+            var btnLimpiar = BotonSecundario("Limpiar campos", 140);
+            btnLimpiar.Height = 34;
             btnLimpiar.Click += (s, e) => LimpiarCamposRegistro();
 
             panelBotones.Controls.Add(btnRegistrar);
@@ -217,12 +356,16 @@ namespace ProyectoMundial.Formularios
             return contenedor;
         }
 
+        private TextBox CampoTexto() => new TextBox { Dock = DockStyle.Fill, BackColor = ColorPanel, ForeColor = ColorTexto, BorderStyle = BorderStyle.FixedSingle };
+
         private NumericUpDown NuevoNumeric(int min, int max) => new NumericUpDown
         {
             Dock = DockStyle.Fill,
             Minimum = min,
             Maximum = max,
-            Value = 0
+            Value = 0,
+            BackColor = ColorPanel,
+            ForeColor = ColorTexto
         };
 
         private void BtnRegistrar_Click(object? sender, EventArgs e)
@@ -265,6 +408,7 @@ namespace ProyectoMundial.Formularios
             numAmarillas.Value = jugador.TarjetasAmarillas;
             numRojas.Value = jugador.TarjetasRojas;
             numPartidos.Value = jugador.PartidosJugados;
+            numPorterias.Value = jugador.PorteriasACero;
 
             MostrarEstado($"Datos de {id} cargados. Modifica lo necesario y presiona 'Guardar cambios'.");
         }
@@ -288,6 +432,7 @@ namespace ProyectoMundial.Formularios
             jugador.TarjetasAmarillas = (int)numAmarillas.Value;
             jugador.TarjetasRojas = (int)numRojas.Value;
             jugador.PartidosJugados = (int)numPartidos.Value;
+            jugador.PorteriasACero = (int)numPorterias.Value;
 
             MostrarEstado($"Datos de {id} actualizados.");
             RefrescarCatalogo();
@@ -303,7 +448,8 @@ namespace ProyectoMundial.Formularios
             (int)numAsistencias.Value,
             (int)numAmarillas.Value,
             (int)numRojas.Value,
-            (int)numPartidos.Value
+            (int)numPartidos.Value,
+            (int)numPorterias.Value
         );
 
         private void LimpiarCamposRegistro()
@@ -318,19 +464,22 @@ namespace ProyectoMundial.Formularios
             numAmarillas.Value = 0;
             numRojas.Value = 0;
             numPartidos.Value = 0;
+            numPorterias.Value = 0;
         }
 
         // ================= BUSQUEDA =================
         private Control ConstruirPanelBusqueda()
         {
-            var contenedor = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24) };
+            var contenedor = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24), BackColor = ColorFondo };
 
-            var lblTitulo = new Label { Text = "Id del jugador:", Left = 0, Top = 14, Width = 120 };
-            txtBuscarId = new TextBox { Left = 130, Top = 11, Width = 160 };
-            var btnBuscar = new Button { Text = "Buscar", Left = 300, Top = 8, Width = 100, Height = 30 };
+            var lblTitulo = new Label { Text = "Id del jugador:", Left = 0, Top = 14, Width = 120, ForeColor = ColorTexto };
+            txtBuscarId = CampoTextoPosicionado(130, 11, 160);
+            var btnBuscar = BotonSecundario("Buscar", 100);
+            btnBuscar.Left = 300; btnBuscar.Top = 8; btnBuscar.Height = 30;
             btnBuscar.Click += BtnBuscar_Click;
 
-            var btnEliminar = new Button { Text = "Eliminar este jugador", Left = 410, Top = 8, Width = 170, Height = 30 };
+            var btnEliminar = BotonSecundario("Eliminar este jugador", 170);
+            btnEliminar.Left = 410; btnEliminar.Top = 8; btnEliminar.Height = 30;
             btnEliminar.Click += BtnEliminarDesdeBusqueda_Click;
 
             lblResultadoBusqueda = new Label
@@ -340,7 +489,8 @@ namespace ProyectoMundial.Formularios
                 Width = 750,
                 Height = 280,
                 Font = new Font("Consolas", 11.5F),
-                Text = "Escribe un Id y presiona Buscar."
+                Text = "Escribe un Id y presiona Buscar.",
+                ForeColor = ColorTexto
             };
 
             contenedor.Controls.Add(lblTitulo);
@@ -351,6 +501,12 @@ namespace ProyectoMundial.Formularios
 
             return contenedor;
         }
+
+        private TextBox CampoTextoPosicionado(int left, int top, int width) => new TextBox
+        {
+            Left = left, Top = top, Width = width,
+            BackColor = ColorPanel, ForeColor = ColorTexto, BorderStyle = BorderStyle.FixedSingle
+        };
 
         private void BtnBuscar_Click(object? sender, EventArgs e)
         {
@@ -373,7 +529,8 @@ namespace ProyectoMundial.Formularios
                 $"Asistencias:      {jugador.Asistencias}\n" +
                 $"Tarjetas amar.:   {jugador.TarjetasAmarillas}\n" +
                 $"Tarjetas rojas:   {jugador.TarjetasRojas}\n" +
-                $"Partidos jugados: {jugador.PartidosJugados}";
+                $"Partidos jugados: {jugador.PartidosJugados}\n" +
+                $"Porterias a 0:    {jugador.PorteriasACero}";
         }
 
         private void BtnEliminarDesdeBusqueda_Click(object? sender, EventArgs e)
@@ -410,36 +567,29 @@ namespace ProyectoMundial.Formularios
         // ================= RANKINGS =================
         private Control ConstruirPanelRankings()
         {
-            var contenedor = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24) };
+            var contenedor = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24), BackColor = ColorFondo };
 
-            var lblCategoria = new Label { Text = "Categoria:", Left = 0, Top = 14, Width = 90 };
-            cmbCategoria = new ComboBox { Left = 90, Top = 11, Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+            var lblCategoria = new Label { Text = "Categoria:", Left = 0, Top = 14, Width = 90, ForeColor = ColorTexto };
+            cmbCategoria = new ComboBox { Left = 90, Top = 11, Width = 200, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = ColorPanel, ForeColor = ColorTexto };
             cmbCategoria.Items.AddRange(new object[]
             {
                 "Goles", "Asistencias", "Minutos jugados",
-                "Tarjetas amarillas", "Tarjetas rojas", "Partidos jugados"
+                "Tarjetas amarillas", "Tarjetas rojas", "Partidos jugados", "Porterias a 0"
             });
             cmbCategoria.SelectedIndex = 0;
 
-            var btnTop5 = new Button { Text = "Ver Top 5", Left = 300, Top = 8, Width = 110, Height = 30 };
+            var btnTop5 = BotonSecundario("Ver Top 5", 110);
+            btnTop5.Left = 300; btnTop5.Top = 8; btnTop5.Height = 30;
             btnTop5.Click += (s, e) => MostrarRanking(soloTop5: true);
 
-            var btnCompleto = new Button { Text = "Listado completo", Left = 420, Top = 8, Width = 150, Height = 30 };
+            var btnCompleto = BotonSecundario("Listado completo", 150);
+            btnCompleto.Left = 420; btnCompleto.Top = 8; btnCompleto.Height = 30;
             btnCompleto.Click += (s, e) => MostrarRanking(soloTop5: false);
 
-            gridRankings = new DataGridView
-            {
-                Left = 0,
-                Top = 60,
-                Width = 950,
-                Height = 480,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
-                ReadOnly = true,
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect
-            };
+            gridRankings = NuevoGrid();
+            gridRankings.Left = 0;
+            gridRankings.Top = 60;
+            gridRankings.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
             ConfigurarColumnasJugador(gridRankings);
 
             contenedor.Controls.Add(lblCategoria);
@@ -461,6 +611,7 @@ namespace ProyectoMundial.Formularios
                 "Tarjetas amarillas" => j => j.TarjetasAmarillas,
                 "Tarjetas rojas" => j => j.TarjetasRojas,
                 "Partidos jugados" => j => j.PartidosJugados,
+                "Porterias a 0" => j => j.PorteriasACero,
                 _ => j => j.Goles
             };
         }
@@ -479,24 +630,16 @@ namespace ProyectoMundial.Formularios
         // ================= CATALOGO =================
         private Control ConstruirPanelCatalogo()
         {
-            var contenedor = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24) };
+            var contenedor = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24), BackColor = ColorFondo };
 
-            var btnRefrescar = new Button { Text = "Actualizar catalogo", Left = 0, Top = 10, Width = 170, Height = 30 };
+            var btnRefrescar = BotonSecundario("Actualizar catalogo", 170);
+            btnRefrescar.Left = 0; btnRefrescar.Top = 10; btnRefrescar.Height = 30;
             btnRefrescar.Click += (s, e) => RefrescarCatalogo();
 
-            gridCatalogo = new DataGridView
-            {
-                Left = 0,
-                Top = 55,
-                Width = 950,
-                Height = 480,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
-                ReadOnly = true,
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect
-            };
+            gridCatalogo = NuevoGrid();
+            gridCatalogo.Left = 0;
+            gridCatalogo.Top = 55;
+            gridCatalogo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
             ConfigurarColumnasJugador(gridCatalogo);
 
             contenedor.Controls.Add(btnRefrescar);
@@ -511,20 +654,63 @@ namespace ProyectoMundial.Formularios
         }
 
         // ================= AYUDANTES COMPARTIDOS =================
+        private DataGridView NuevoGrid() => new DataGridView
+        {
+            Width = 1000,
+            Height = 480,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            RowHeadersVisible = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            BackgroundColor = ColorFondo,
+            GridColor = ColorBorde,
+            BorderStyle = BorderStyle.FixedSingle,
+            EnableHeadersVisualStyles = false,
+            ColumnHeadersDefaultCellStyle =
+            {
+                BackColor = ColorPanel,
+                ForeColor = ColorTextoSecundario,
+                SelectionBackColor = ColorPanel,
+                SelectionForeColor = ColorTextoSecundario,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
+            },
+            DefaultCellStyle =
+            {
+                BackColor = ColorPanel,
+                ForeColor = ColorTexto,
+                SelectionBackColor = ColorSeleccion,
+                SelectionForeColor = ColorTexto
+            }
+        };
+
+        // Cada columna tiene el ancho que realmente necesita su contenido (la
+        // mayoria son numeros cortos): asi caben las 11 columnas sin verse
+        // separadas artificialmente. Si aun asi no caben, el grid muestra
+        // su scroll horizontal normal en vez de deformar las columnas.
         private void ConfigurarColumnasJugador(DataGridView grid)
         {
             grid.Columns.Clear();
-            grid.Columns.Add("colId", "Id");
-            grid.Columns.Add("colNombre", "Nombre");
-            grid.Columns.Add("colSeleccion", "Seleccion");
-            grid.Columns.Add("colPosicion", "Posicion");
-            grid.Columns.Add("colMinutos", "Minutos");
-            grid.Columns.Add("colGoles", "Goles");
-            grid.Columns.Add("colAsistencias", "Asistencias");
-            grid.Columns.Add("colAmarillas", "T. Amarillas");
-            grid.Columns.Add("colRojas", "T. Rojas");
-            grid.Columns.Add("colPartidos", "Partidos");
+            grid.Columns.Add(NuevaColumna("colId", "Id", 100));
+            grid.Columns.Add(NuevaColumna("colNombre", "Nombre", 290));
+            grid.Columns.Add(NuevaColumna("colSeleccion", "Seleccion", 210));
+            grid.Columns.Add(NuevaColumna("colPosicion", "Posicion", 165));
+            grid.Columns.Add(NuevaColumna("colMinutos", "Minutos", 165));
+            grid.Columns.Add(NuevaColumna("colGoles", "Goles", 165));
+            grid.Columns.Add(NuevaColumna("colAsistencias", "Asistencias", 165));
+            grid.Columns.Add(NuevaColumna("colAmarillas", "T. Amarillas", 165));
+            grid.Columns.Add(NuevaColumna("colRojas", "T. Rojas", 165));
+            grid.Columns.Add(NuevaColumna("colPartidos", "Partidos", 165));
+            grid.Columns.Add(NuevaColumna("colPorterias", "Porterias a 0", 165));
         }
+
+        private DataGridViewTextBoxColumn NuevaColumna(string nombre, string encabezado, int ancho) => new DataGridViewTextBoxColumn
+        {
+            Name = nombre,
+            HeaderText = encabezado,
+            Width = ancho
+        };
 
         private void LlenarGrid(DataGridView grid, Jugador[] jugadores)
         {
@@ -533,7 +719,7 @@ namespace ProyectoMundial.Formularios
             {
                 grid.Rows.Add(j.Id, j.Nombre, j.Seleccion, j.Posicion,
                     j.MinutosJugados, j.Goles, j.Asistencias,
-                    j.TarjetasAmarillas, j.TarjetasRojas, j.PartidosJugados);
+                    j.TarjetasAmarillas, j.TarjetasRojas, j.PartidosJugados, j.PorteriasACero);
             }
         }
     }

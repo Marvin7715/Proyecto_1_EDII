@@ -15,12 +15,14 @@ namespace ProyectoMundial.Modelos
         public int TarjetasAmarillas { get; set; }
         public int TarjetasRojas { get; set; }
         public int PartidosJugados { get; set; }
+        public int PorteriasACero { get; set; } // relevante para porteros; en el resto de posiciones queda en 0
 
         public Jugador() { }
 
         public Jugador(string id, string nombre, string seleccion, string posicion,
                         int minutosJugados, int goles, int asistencias,
-                        int tarjetasAmarillas, int tarjetasRojas, int partidosJugados)
+                        int tarjetasAmarillas, int tarjetasRojas, int partidosJugados,
+                        int porteriasACero = 0)
         {
             Id = id;
             Nombre = nombre;
@@ -32,6 +34,7 @@ namespace ProyectoMundial.Modelos
             TarjetasAmarillas = tarjetasAmarillas;
             TarjetasRojas = tarjetasRojas;
             PartidosJugados = partidosJugados;
+            PorteriasACero = porteriasACero;
         }
 
         // Util para mostrar rapido en consola, listas o el manual tecnico.
@@ -44,10 +47,12 @@ namespace ProyectoMundial.Modelos
         public string ALineaCsv()
         {
             return string.Join(",", Id, Nombre, Seleccion, Posicion,
-                MinutosJugados, Goles, Asistencias, TarjetasAmarillas, TarjetasRojas, PartidosJugados);
+                MinutosJugados, Goles, Asistencias, TarjetasAmarillas, TarjetasRojas, PartidosJugados,
+                PorteriasACero);
         }
 
         // Reconstruye un Jugador a partir de una linea leida del .csv
+        // Soporta archivos viejos (sin la columna PorteriasACero) para no romper compatibilidad.
         public static Jugador DesdeLineaCsv(string linea)
         {
             var partes = linea.Split(',');
@@ -61,7 +66,8 @@ namespace ProyectoMundial.Modelos
                 asistencias: int.Parse(partes[6]),
                 tarjetasAmarillas: int.Parse(partes[7]),
                 tarjetasRojas: int.Parse(partes[8]),
-                partidosJugados: int.Parse(partes[9])
+                partidosJugados: int.Parse(partes[9]),
+                porteriasACero: partes.Length > 10 ? int.Parse(partes[10]) : 0
             );
         }
     }
